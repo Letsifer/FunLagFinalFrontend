@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane id="AnchorPane" prefHeight="395.0" prefWidth="501.0" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8" fx:controller="ru.lets.funlagitog.FXMLController">
+   <children>
+      <ComboBox fx:id="operatorComboBox" layoutX="90.0" layoutY="63.0" prefWidth="150.0" />
+      <Button layoutX="275.0" layoutY="63.0" mnemonicParsing="false" onAction="#onChooseOperator" text="Выбрать" />
+      <Label layoutX="90.0" layoutY="38.0" text="Выберите оператора" />
+      <TextField fx:id="telephoneNumberTextField" layoutX="91.0" layoutY="185.0" promptText="Телефон" />
+      <Button layoutX="281.0" layoutY="185.0" mnemonicParsing="false" onAction="#startCallAction" text="Позвонить" />
+      <Button layoutX="91.0" layoutY="291.0" mnemonicParsing="false" onAction="#findBalanceAction" text="Узнать баланс" />
+   </children>
+</AnchorPane>
