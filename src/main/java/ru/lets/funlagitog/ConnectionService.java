@@ -1,23 +1,24 @@
 package ru.lets.funlagitog;
 
-import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpConnection;
-import com.ericsson.otp.erlang.OtpErlangDecodeException;
-import com.ericsson.otp.erlang.OtpErlangExit;
-import com.ericsson.otp.erlang.OtpErlangObject;
-import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
-import com.ericsson.otp.erlang.OtpMbox;
-import com.ericsson.otp.erlang.OtpNode;
-import com.ericsson.otp.erlang.OtpPeer;
-import com.ericsson.otp.erlang.OtpSelf;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
 import java.io.IOException;
-import java.net.UnknownHostException;
+import java.net.URI;
+import javax.websocket.ClientEndpoint;
+import javax.websocket.ContainerProvider;
+import javax.websocket.DeploymentException;
+import javax.websocket.OnClose;
+import javax.websocket.OnMessage;
+import javax.websocket.Session;
+import javax.websocket.WebSocketContainer;
 
 /**
  *
  * @author Евгений
  */
+@ClientEndpoint
 public class ConnectionService {
 
     private static ConnectionService CONNECTION_SERVICE;
@@ -29,62 +30,59 @@ public class ConnectionService {
         return CONNECTION_SERVICE;
     }
 
-    public ConnectionService() throws IOException {
-        OtpNode node = new OtpNode("client");
-        node.setCookie(COOKIE);
-        mailBox = node.createMbox();
-        Thread thread = new Thread(() -> {
-            try {
-                //TODO
-                while (true) {
-                    OtpErlangObject message = mailBox.receive();
-                    //if stop in tuple - call stop in call controller
-                    //if balance in tuple - 
-//                    receiveBalance = true;
-//                    balanceResult = message; //или элемент тьюпла
-                    Thread.sleep(100);
-                }
-            } catch (OtpErlangDecodeException | OtpErlangExit | InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
-        thread.setDaemon(true);
-        thread.start();
+    private Session callSession;
+    private final String restPath = "reg";
+
+    private void connectToWebSocket(String websocketUrl) {
+        WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+        try {
+            URI uri = URI.create("ws://" + websocketUrl + "/call");
+            callSession = container.connectToServer(this, uri);
+        } catch (DeploymentException | IOException ex) {
+            ex.printStackTrace();
+        }
     }
 
-    private final static String COOKIE = "cookie";
-    private final OtpMbox mailBox;
-    private final String nodeName = "nodename@...";
-    private final String mailBoxName = "mailbox";
-    private final String moduleName = "module";
-    private final String functionName = "function";
-
-    public void connect() throws IOException, OtpErlangExit, OtpErlangDecodeException, UnknownHostException, OtpAuthException {
-        OtpSelf self = new OtpSelf("javaSelf", COOKIE);
-        OtpPeer other = new OtpPeer(nodeName);
-        OtpConnection connection = self.connect(other);
-        System.out.println(connection.isConnected());
-        connection.sendRPC(moduleName, functionName, new OtpErlangObject[]{mailBox.self()});
+    public Response register(String telephone, Operator operator, Region region) throws IOException {
+        Client client = Client.create();
+        client.getProperties().put("phone", telephone);
+        client.getProperties().put("operator", operator.getId());
+        WebResource webResource = client.resource("http://" + region.getIpAddress()).path(restPath);
+        ClientResponse response = webResource.post(ClientResponse.class);
+        if (response.getStatus() != 200) {
+            throw new RuntimeException("Failed : HTTP error code : " + response.getStatus());
+        }
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(response.getEntityInputStream(), Response.class);
     }
 
-    private boolean receiveBalance = false;
-    private OtpErlangObject balanceResult;
-
-    public int findBalance() throws IOException, OtpErlangExit, OtpErlangDecodeException {
-        mailBox.send(mailBoxName, nodeName, new OtpErlangString("balance"));
-        while (!receiveBalance);
-        int balance = Integer.parseInt(balanceResult.toString());
-        return balance;
+    public int findBalance(Integer id, Region region) throws IOException {
+        Client client = Client.create();
+        WebResource webResource = client.resource("http://" + region.getIpAddress()).path("balance/" + id);
+        ClientResponse response = webResource.get(ClientResponse.class);
+        if (response.getStatus() != 200) {
+            throw new RuntimeException("Failed : HTTP error code : " + response.getStatus());
+        }
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(response.getEntityInputStream(), BalanceResponse.class).getBalance();
     }
 
-    public void startCall(String telephone) {
-        mailBox.send(mailBoxName, nodeName, new OtpErlangTuple(new OtpErlangObject[]{
-            new OtpErlangString("call"), new OtpErlangString(telephone)
-        }));
+    public void startCall(String telephone, Region region) throws IOException {
+        connectToWebSocket(region.getIpAddress());
+        callSession.getBasicRemote().sendText("call: " + telephone);
+    }
+
+    public void stopCall(String telephone, Region region) throws IOException {
+        callSession.close();
+    }
+
+    @OnMessage
+    public void onMessage(Session session, String message) {
 
     }
 
-    public void stopCall(String telephone) {
-        mailBox.send(mailBoxName, nodeName, new OtpErlangString("stop"));
+    @OnClose
+    public void onClose() {
+
     }
 }

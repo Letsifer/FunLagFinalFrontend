@@ -1,5 +1,6 @@
 package ru.lets.funlagitog;
 
+import java.io.IOException;
 import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -19,13 +20,19 @@ import lombok.Setter;
  * @author Евгений
  */
 public class CallController implements Initializable {
-    
-    private final ConnectionService connectionService = ConnectionService.getConnectionService();
+
+    private final ConnectionService connectionService;
+
+    public CallController() throws IOException {
+        connectionService = ConnectionService.getConnectionService();
+    }
 
     @Setter
     private Stage currentStage;
 
     private Operator operator;
+    @Setter
+    private Region region;
 
     @FXML
     private Label phoneLabel;
@@ -60,36 +67,46 @@ public class CallController implements Initializable {
     private static final Integer ONE_SECOND = 1000;
 
     public void show() {
-        connectionService.startCall(telephone);
-        startTime = LocalDateTime.now();
-        secondsTimer = new Timer();
-        secondsTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                Platform.runLater(() -> {
-                    Duration duration = Duration.between(startTime, LocalDateTime.now());
-                    long minutes = duration.getSeconds() / 60;
-                    long seconds = duration.getSeconds() % 60;
-                    String minutesText = convertLongToTimePart(minutes);
-                    String secondsText = convertLongToTimePart(seconds);
-                    String durationText = minutesText + ":" + secondsText;
-                    durationLabel.setText(durationText);
-                });
-            }
-        }, 0, ONE_SECOND);
-        currentStage.showAndWait();
+        try {
+            connectionService.startCall(telephone, region);
+            startTime = LocalDateTime.now();
+            secondsTimer = new Timer();
+            secondsTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    Platform.runLater(() -> {
+                        Duration duration = Duration.between(startTime, LocalDateTime.now());
+                        long minutes = duration.getSeconds() / 60;
+                        long seconds = duration.getSeconds() % 60;
+                        String minutesText = convertLongToTimePart(minutes);
+                        String secondsText = convertLongToTimePart(seconds);
+                        String durationText = minutesText + ":" + secondsText;
+                        durationLabel.setText(durationText);
+                    });
+                }
+            }, 0, ONE_SECOND);
+            currentStage.showAndWait();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
-    
+
     private String convertLongToTimePart(long part) {
-        if (part >= 10) return Long.toString(part);
+        if (part >= 10) {
+            return Long.toString(part);
+        }
         return "0" + Long.toString(part);
     }
 
     @FXML
     private void stopCall(ActionEvent event) {
-        connectionService.stopCall(telephone);
-        secondsTimer.cancel();
-        currentStage.close();
+        try {
+            connectionService.stopCall(telephone, region);
+            secondsTimer.cancel();
+            currentStage.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }
