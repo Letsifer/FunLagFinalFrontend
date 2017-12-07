@@ -69,7 +69,7 @@ public class ConnectionService {
 
     public void startCall(String telephone, Region region) throws IOException {
         connectToWebSocket(region.getIpAddress());
-        callSession.getBasicRemote().sendText("call: " + telephone);
+        callSession.getBasicRemote().sendText("{event: call:, data: 123423}");
     }
 
     public void stopCall(String telephone, Region region) throws IOException {
@@ -78,7 +78,7 @@ public class ConnectionService {
 
     @OnMessage
     public void onMessage(Session session, String message) {
-
+        System.out.println("Message from server " + message);
     }
 
     @OnClose
